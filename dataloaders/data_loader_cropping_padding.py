@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -36,20 +36,32 @@ class CroppedPaddedDataset(Dataset):
 
         img = Image.open(path).convert("RGB")
 
+        #Resize
         w, h = img.size
         new_h = self.target_h
         new_w = int(w * (new_h / h))
         img = img.resize((new_w, new_h))
 
+     
+        #Enhancement
+        img = img.filter(ImageFilter.MedianFilter(size=1))
+        img = ImageEnhance.Contrast(img).enhance(2)
+        img = img.filter(ImageFilter.UnsharpMask(
+            radius=2.0,
+            percent=180,
+            threshold=5
+        ))
+
+        #To tensor
         img = self.transform(img)
         _, h, w = img.shape
 
-        #If greater than target
+        #Crop
         if w > self.target_w:
             start = (w - self.target_w) // 2
             img = img[:, :, start:start + self.target_w]
 
-        #If smaller than target
+        #Pad
         elif w < self.target_w:
             pad_w = self.target_w - w
             pad_left = pad_w // 2

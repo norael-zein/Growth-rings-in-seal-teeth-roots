@@ -1,10 +1,16 @@
 SplitImages/
 Unlabeled/
 NewImages/
-images/
 labels.csv
-labels_original.csv
-.ipynb_checkpoints/
-
-
+annot_crops.csv
+annotations_original.csv
+**/.ipynb_checkpoints/
+preprocessing/.ipynb_checkpoints/
+dataloaders/images/
+images_original
+images_original/
+*.png
+*.PNG
+*.jpg
+*.JPG
 
