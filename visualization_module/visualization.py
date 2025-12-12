@@ -12,7 +12,15 @@ def load_age_annotations(csv_path):
     return age_dict
 
 
-def process_image(img_path, true_age=None, clip_limit=2.0, tile_grid_size=(8, 8)):
+def process_image(
+    img_path,
+    true_age=None,
+    clip_limit=5.0,
+    tile_grid_size=(8, 8),
+    median_ksize=3,          #Denoise 
+    gauss_ksize=(5, 5),      #Blurr
+    gauss_sigma=0.8          #Blurr intensity 
+):
 
     img = cv2.imread(img_path)
     if img is None:
@@ -21,12 +29,16 @@ def process_image(img_path, true_age=None, clip_limit=2.0, tile_grid_size=(8, 8)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    #CLAHE 
+    #CLAHE
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
     eq = clahe.apply(gray)
 
+    #Denoise and blurr 
+    denoised = cv2.medianBlur(eq, median_ksize)
+    smooth = cv2.GaussianBlur(denoised, gauss_ksize, gauss_sigma)
+
     #Normalize
-    norm = cv2.normalize(eq, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    norm = cv2.normalize(smooth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
     #Select line
     plt.figure(figsize=(8, 6))
@@ -59,7 +71,7 @@ def process_image(img_path, true_age=None, clip_limit=2.0, tile_grid_size=(8, 8)
     profile = norm[ys_int, xs_int]
 
     #Peak detection
-    peaks, _ = find_peaks(profile, distance=10, prominence=50)
+    peaks, _ = find_peaks(profile, distance=12, prominence=70)
     pred_age = len(peaks)
 
     #Plot results
