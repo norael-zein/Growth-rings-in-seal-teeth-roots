@@ -134,9 +134,9 @@ def process_image(
 
     title = os.path.basename(img_path)
     if true_age is not None:
-        title += f"\nPredicted: {pred_age} | True: {true_age}"
+        title += f"\nNumber of potential growth lines: {pred_age} | True: {true_age}"
     else:
-        title += f"\nPredicted: {pred_age} (true missing)"
+        title += f"\nNumber of potential growth lines: {pred_age} (true missing)"
     ax1.set_title(title)
     ax1.axis("off")
 
@@ -153,8 +153,8 @@ def process_image(
 
 
 def main():
-    image_dir = "../images_original"
-    annot_path = "../annotations_original.csv"
+    image_dir = "../../images_original"
+    annot_path = "../../annotations_original.csv"
 
     image_files = sorted(
         f for f in os.listdir(image_dir)

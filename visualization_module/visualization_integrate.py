@@ -76,12 +76,12 @@ def visualization(p1, p2, img):
         width=1
     )
 
-    pred_age = len(peaks)
+    num_rings = len(peaks)
 
     #Return results
     return {
-        #Estimated age (number of detected rings)
-        "pred_age": pred_age,  
+        #Number of rings found 
+        "num_rings": num_rings,  
         #Intensity profile (blue curve)
         "profile": profile,
         #X-coordinates of the line
