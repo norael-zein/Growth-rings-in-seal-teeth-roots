@@ -1,0 +1,12 @@
+gradio==4.44.0
+gradio_client==0.8.1
+
+numpy==1.26.4
+scipy==1.11.4
+
+opencv-python==4.9.0.80
+Pillow==10.2.0
+
+matplotlib==3.8.2
+
+torch==2.2.1
