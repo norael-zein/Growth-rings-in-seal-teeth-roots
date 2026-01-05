@@ -32,12 +32,16 @@ You should see something like: _Python 3.11.x_
 2. Click Download ZIP
 3. Unzip the downloaded folder and add it to your desktop
 4. Open the folder in a program where you can run the code (for example Visual Studio Code)
+
 ---
 
 ## Step 3: Install required packages
 
 **Run**:
 _pip install -r requirements.txt_
+
+---
+
 ## Step 4: Run the application
 
 **Run**:
