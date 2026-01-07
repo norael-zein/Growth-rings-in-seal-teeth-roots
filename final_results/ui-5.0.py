@@ -1,10 +1,5 @@
 from visualization_integrate import visualization
 
-
-# =============================================================================
-# Prevent proxy interception of localhost and patch old gradio_client boolean
-# schema crash by overriding get_type for boolean schemas.
-# =============================================================================
 import os
 os.environ["NO_PROXY"] = "127.0.0.1,localhost"
 os.environ["no_proxy"] = "127.0.0.1,localhost"
@@ -21,15 +16,7 @@ try:
         _gc_utils.get_type = _patched_get_type
 except Exception:
     pass
-# =============================================================================
-# Patch end
-# =============================================================================
 
-
-# =============================================================================
-# Standard library and third-party imports for IO, image processing, plotting,
-# numerical computation, and UI construction.
-# =============================================================================
 from typing import Tuple, Dict, Any
 import io, tempfile, csv, base64
 import gradio as gr
@@ -46,18 +33,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 from datetime import datetime
 from PIL import Image, ImageEnhance, ImageFilter
 
-
-# =============================================================================
-# PyTorch imports and utilities for CNN-based age regression inference.
-# =============================================================================
 import torch
 import torch.nn as nn
 from functools import lru_cache
 
 
-# =============================================================================
-# Squeeze-and-Excitation block used to recalibrate channel-wise feature responses.
-# =============================================================================
 class SEBlock(nn.Module):
     def __init__(self, channel, reduction=16):
         super().__init__()
@@ -76,11 +56,6 @@ class SEBlock(nn.Module):
         return x * y
 
 
-# =============================================================================
-# CNN regression model definition for predicting age from a fixed-size ROI.
-# Input shape:  [B, 3, 200, 400]
-# Output shape: [B] (scalar age regression)
-# =============================================================================
 class BetterCNNRegressor(nn.Module):
     def __init__(self):
         super().__init__()
@@ -91,7 +66,7 @@ class BetterCNNRegressor(nn.Module):
             nn.Conv2d(32, 32, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # 200x400 -> 100x200
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
             nn.Conv2d(32, 64, kernel_size=(3, 5), padding=(1, 2), bias=False),
             nn.BatchNorm2d(64),
@@ -99,7 +74,7 @@ class BetterCNNRegressor(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),  # 100x200 -> 50x100
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
             nn.Conv2d(64, 128, kernel_size=(3, 5), padding=(1, 4), dilation=(1, 2), bias=False),
             nn.BatchNorm2d(128),
@@ -111,7 +86,7 @@ class BetterCNNRegressor(nn.Module):
             SEBlock(channel=128, reduction=16)
         )
 
-        self.pool = nn.AdaptiveAvgPool2d((1, 50))  # [B,128,50,100] -> [B,128,1,50]
+        self.pool = nn.AdaptiveAvgPool2d((1, 50))
 
         self.conv_head = nn.Sequential(
             nn.Conv1d(128, 128, kernel_size=3, padding=1),
@@ -127,19 +102,17 @@ class BetterCNNRegressor(nn.Module):
         )
 
     def forward(self, x):
-        x = self.features(x)   # [B,128,50,100]
-        x = self.pool(x)       # [B,128,1,50]
-        x = x.squeeze(2)       # [B,128,50]
-        x = self.conv_head(x)  # [B,64,50]
-        x = self.fc(x)         # [B,1]
-        return x.squeeze(1)    # [B]
+        x = self.features(x)
+        x = self.pool(x)
+        x = x.squeeze(2)
+        x = self.conv_head(x)
+        x = self.fc(x)
+        return x.squeeze(1)
 
 
-# =============================================================================
-# CNN model loading, caching, and ROI preprocessing to match training pipeline.
-# =============================================================================
-CNN_WEIGHTS_PATH = "cnn_age.pth"   # Set this to your weights file path (default: same directory)
-CNN_DEVICE = "cpu"                # Use "cuda" if CUDA is available and configured
+CNN_WEIGHTS_PATH = "cnn_age.pth"
+CNN_DEVICE = "cpu"
+
 
 @lru_cache(maxsize=1)
 def load_cnn_model_cached(weights_path: str = CNN_WEIGHTS_PATH, device_str: str = CNN_DEVICE):
@@ -154,20 +127,15 @@ def load_cnn_model_cached(weights_path: str = CNN_WEIGHTS_PATH, device_str: str 
 def preprocess_roi_for_bettercnn(roi_rgb: np.ndarray) -> torch.Tensor:
     if roi_rgb is None:
         raise ValueError("roi_rgb is None")
-
-    # Force model input size: W=400, H=200
     roi_rgb = cv.resize(roi_rgb, (400, 200), interpolation=cv.INTER_AREA)
-
-    x = roi_rgb.astype(np.float32) / 255.0  # 0~1
-    x = np.transpose(x, (2, 0, 1))          # HWC -> CHW
-    x = torch.from_numpy(x).unsqueeze(0)    # 1x3x200x400
+    x = roi_rgb.astype(np.float32) / 255.0
+    x = np.transpose(x, (2, 0, 1))
+    x = torch.from_numpy(x).unsqueeze(0)
     return x.contiguous()
 
 
-# =============================================================================
-# General helper utilities for padding, drawing, image conversion, and encoding.
-# =============================================================================
 BOX = 1000
+
 
 def ensure_min_size_1000(img: np.ndarray, box: int = BOX) -> np.ndarray:
     h, w = img.shape[:2]
@@ -196,6 +164,7 @@ def draw_line(img_bgr: np.ndarray, p1: Tuple[int, int], p2: Tuple[int, int],
     cv.line(out, p1, p2, color, thickness, cv.LINE_AA)
     return out
 
+
 def draw_red_x_bgr(img_bgr: np.ndarray, x: int, y: int, size: int = 7, thickness: int = 2):
     cv.line(img_bgr, (x - size, y - size), (x + size, y + size), (0, 0, 255), thickness, cv.LINE_AA)
     cv.line(img_bgr, (x - size, y + size), (x + size, y - size), (0, 0, 255), thickness, cv.LINE_AA)
@@ -213,9 +182,6 @@ def b64_image_data_uri(path: str) -> str:
         return ""
 
 
-# =============================================================================
-# Dataset-like image enhancement using PIL to match training-time augmentation.
-# =============================================================================
 def enhance_pil_like_dataset(
     img: Image.Image,
     contrast_factor: float = 2.0,
@@ -256,9 +222,6 @@ def enhance_bgr_like_dataset(
     return cv.cvtColor(rgb2, cv.COLOR_RGB2BGR)
 
 
-# =============================================================================
-# Rotated ROI extraction by a user-defined line using a perspective transform.
-# =============================================================================
 def rotated_roi_from_line(
     img_bgr: np.ndarray,
     p1: Tuple[int, int],
@@ -307,16 +270,7 @@ def rotated_roi_from_line(
     return roi_rgb
 
 
-# =============================================================================
-# Intensity profile extraction and adaptive peak detection for ROI analysis.
-# (UPDATED: follow the same principle as visualization())
-# =============================================================================
 def roi_center_band_profile(roi_gray_u8: np.ndarray, band: int = 3) -> np.ndarray:
-    """
-    - Sample points along ROI center horizontal line.
-    - Average a small vertical band around that line.
-    Returns: profile_u8, shape [W]
-    """
     if roi_gray_u8 is None:
         raise ValueError("roi_gray_u8 is None")
     if roi_gray_u8.ndim != 2:
@@ -345,10 +299,6 @@ def roi_center_band_profile(roi_gray_u8: np.ndarray, band: int = 3) -> np.ndarra
 
 
 def adaptive_peaks_like_visualization(profile_u8: np.ndarray):
-    """
-    Detect peaks on inverted profile (dark rings) with adaptive distance/prominence.
-    Returns: peaks (np.ndarray), dbg (dict)
-    """
     if profile_u8 is None:
         raise ValueError("profile_u8 is None")
     if profile_u8.ndim != 1:
@@ -414,29 +364,23 @@ def adaptive_peaks_like_visualization(profile_u8: np.ndarray):
     return peaks.astype(np.int32), dbg
 
 
-# =============================================================================
-# Per-page state management for multi-image workflows in the Gradio UI.
-# =============================================================================
 def make_empty_page():
     return {
         "line_pts": [],
-        "orig_rgb": None,        # RGB (original)
-        "image_name": "",        # image basename for report
-        "orig_with_line": None,  # RGB
-        "roi_preview": None,     # RGB (rotated crop)
-        "profile_img": None,     # RGB
-        "age": None,             # Age derived from peak count
-        "cnn_age": None          # CNN predicted age
+        "orig_rgb": None,
+        "image_name": "",
+        "orig_with_line": None,
+        "roi_preview": None,
+        "profile_img": None,
+        "age": None,
+        "cnn_age": None
     }
+
 
 def load_page_state(store: Dict[int, Dict[str, Any]], i: int):
     return store.get(i, make_empty_page())
 
 
-# =============================================================================
-# Gradio application builder
-# (UPDATED: removed ROI/Preprocess params UI, but keep valley "x" markers)
-# =============================================================================
 def build_demo():
     TITLE_TXT = "#052453"
     MUTED_TXT = "#1c3e81"
@@ -446,7 +390,6 @@ def build_demo():
     PRIMARY_2 = "#1c3e81"
     ACCENT_TXT = "#a2143a"
 
-    # ---- Fixed defaults (same as your sliders used to be) ----
     DEFAULT_OUT_W = 400
     DEFAULT_OUT_H = 200
     DEFAULT_ROI_HEIGHT_PX = 80
@@ -457,7 +400,6 @@ def build_demo():
     DEFAULT_SHARPEN_PERCENT = 180
     DEFAULT_SHARPEN_THRESHOLD = 5
     DEFAULT_BAND = 3
-    # ---------------------------------------------------------
 
     def popup_warn(msg: str):
         fn = getattr(gr, "Warning", None)
@@ -543,6 +485,20 @@ def build_demo():
           box-sizing: border-box !important;
           overflow: visible !important;
         }}
+
+        .imgcap {{
+          color: {PRIMARY_1};
+          font-weight: 700;
+          margin: 2px 0 6px 0;
+          line-height: 1.2;
+        }}
+        .imgcap .hint {{
+          color: {PRIMARY_1};
+          font-weight: 600;
+          font-size: 12px;
+          opacity: 0.85;
+          margin-left: 8px;
+        }}
     """
 
     custom_theme = gr.themes.Soft().set(
@@ -597,23 +553,32 @@ def build_demo():
             btn_next = gr.Button("Next ➡", size="sm")
 
         state_paths = gr.State([])
-        state_imgs  = gr.State([])
-        state_curr  = gr.State(None)
-        perpage     = gr.State({})
+        state_imgs = gr.State([])
+        state_curr = gr.State(None)
+        perpage = gr.State({})
 
         with gr.Row():
-            orig_view = gr.Image(
-                label="Original (click TWO points)",
-                interactive=False,
-                sources=[]
-            )
-            orig_line_view = gr.Image(label="Original with line", interactive=False)
+            with gr.Column():
+                gr.Markdown(
+                    "**Original** <span class='hint'>please click two points to find the best ROI region</span>",
+                    elem_classes=["imgcap"]
+                )
+                orig_view = gr.Image(
+                    show_label=False,
+                    interactive=False,
+                    sources=[]
+                )
 
-        # ✅ 已删除 ROI / Preprocess params 的 Accordion 和 sliders（UI 不再显示）
+            with gr.Column():
+                gr.Markdown(
+                    "**Output line and peak** <span class='hint'>line + detected peaks </span>",
+                    elem_classes=["imgcap"]
+                )
+                orig_line_view = gr.Image(show_label=False, interactive=False)
 
         with gr.Row():
-            roi_preview_view = gr.Image(label="ROI preview (rotated crop)", interactive=False, elem_id="roi_preview_view")
-            profile_img = gr.Image(label="Intensity (adaptive peaks)", interactive=False)
+            roi_preview_view = gr.Image(label="ROI preview ", interactive=False, elem_id="roi_preview_view")
+            profile_img = gr.Image(label="Intensity map", interactive=False)
 
         with gr.Row():
             btn_cnn = gr.Button("🧠 CNN model predict", variant="primary")
@@ -627,40 +592,156 @@ def build_demo():
 
         with gr.Row():
             pdf_file = gr.File(label="Download (current PDF)", interactive=False)
-            pdf_all  = gr.File(label="Download (all PDFs)", interactive=False)
-            csv_all  = gr.File(label="Download CSV (image, age)", interactive=False)
+            pdf_all = gr.File(label="Download (all PDFs)", interactive=False)
+            csv_all = gr.File(label="Download CSV (image, age)", interactive=False)
 
         info = gr.Markdown("<span class='muted'>👋 Ready.</span>")
 
-        def on_files(files_list):
-            paths = [f.name for f in files_list] if files_list else []
-            imgs = []
-            for p in paths:
+        def on_files(files_list, old_paths, old_imgs, old_curr, old_idx, old_pstore):
+            old_paths = old_paths or []
+            old_imgs = old_imgs or []
+            old_pstore = old_pstore or {}
+            old_idx = 0 if old_idx is None else int(old_idx)
+
+            new_paths_all = [f.name for f in files_list] if files_list else []
+
+            old_set = set(old_paths)
+            add_paths = [p for p in new_paths_all if p not in old_set]
+
+            if not add_paths:
+                return (
+                    old_paths, old_imgs, old_curr, old_idx, old_pstore,
+                    gr.update(), gr.update(), gr.update(), gr.update(), gr.update(),
+                    "<span class='muted'>No new files added.</span>"
+                )
+
+            add_imgs = []
+            for p in add_paths:
                 data = cv.imdecode(np.fromfile(p, dtype=np.uint8), cv.IMREAD_COLOR)
                 if data is not None:
                     data = ensure_min_size_1000(data)
-                    imgs.append(data)
-            curr = imgs[0] if imgs else None
+                    add_imgs.append(data)
 
-            pstore = {}
-            if imgs:
-                for i, _im in enumerate(imgs):
-                    pstore[i] = make_empty_page()
-                    if paths and i < len(paths):
-                        pstore[i]["image_name"] = os.path.basename(paths[i])
+            paths = old_paths + add_paths
+            imgs = old_imgs + add_imgs
+
+            pstore = dict(old_pstore)
+            start_i = len(old_imgs)
+            for j, _im in enumerate(add_imgs):
+                ii = start_i + j
+                pstore[ii] = make_empty_page()
+                if ii < len(paths):
+                    pstore[ii]["image_name"] = os.path.basename(paths[ii])
+
+            if not imgs:
+                return (
+                    [], [], None, 0, {},
+                    None, None, None, None, "",
+                    "<span class='muted'>No valid images loaded.</span>"
+                )
+
+            new_idx = len(imgs) - 1
+            curr = imgs[new_idx]
+            page = load_page_state(pstore, new_idx)
+            cnn_txt = "" if page.get("cnn_age", None) is None else str(int(page["cnn_age"]))
 
             return (
-                paths, imgs, curr, 0, pstore,
-                cv.cvtColor(curr, cv.COLOR_BGR2RGB) if curr is not None else None,
-                None, None, None, "",
-                "<span class='accent'>✅ Images loaded.</span> <span class='muted'>Click TWO points on the original image.</span>"
+                paths, imgs, curr, new_idx, pstore,
+                cv.cvtColor(curr, cv.COLOR_BGR2RGB),
+                page.get("orig_with_line", None),
+                page.get("roi_preview", None),
+                page.get("profile_img", None),
+                cnn_txt,
+                f"<span class='muted'>✅ Added {len(add_imgs)} file(s). Jumped to index {new_idx}.</span>"
             )
 
         files.upload(
             fn=on_files,
-            inputs=[files],
+            inputs=[files, state_paths, state_imgs, state_curr, idx, perpage],
             outputs=[
                 state_paths, state_imgs, state_curr, idx, perpage,
+                orig_view, orig_line_view, roi_preview_view, profile_img, cnn_out,
+                info
+            ]
+        )
+
+        def on_files_clear():
+            return (
+                [], [], None, 0, {},
+                None, None, None, None, "",
+                "<span class='muted'>🧹 Cleared. Please upload images again.</span>"
+            )
+
+        files.clear(
+            fn=on_files_clear,
+            inputs=[],
+            outputs=[
+                state_paths, state_imgs, state_curr, idx, perpage,
+                orig_view, orig_line_view, roi_preview_view, profile_img, cnn_out,
+                info
+            ]
+        )
+
+        def on_files_change(files_list, old_paths, old_imgs, old_pstore, old_idx):
+            new_paths = [f.name for f in files_list] if files_list else []
+            if not new_paths:
+                return (
+                    [], [], {}, None, 0,
+                    None, None, None, None, "",
+                    "<span class='muted'>No files in list.</span>"
+                )
+
+            old_paths = old_paths or []
+            old_imgs = old_imgs or []
+            old_pstore = old_pstore or {}
+            old_idx = 0 if old_idx is None else int(old_idx)
+
+            old_map_img = {p: im for p, im in zip(old_paths, old_imgs)}
+            old_map_page = {p: old_pstore.get(i, make_empty_page()) for i, p in enumerate(old_paths)}
+
+            imgs = []
+            pstore = {}
+            valid_paths = []
+            for i, p in enumerate(new_paths):
+                im = old_map_img.get(p, None)
+                if im is None:
+                    data = cv.imdecode(np.fromfile(p, dtype=np.uint8), cv.IMREAD_COLOR)
+                    if data is None:
+                        continue
+                    im = ensure_min_size_1000(data)
+                imgs.append(im)
+                valid_paths.append(p)
+                page = old_map_page.get(p, make_empty_page())
+                page["image_name"] = os.path.basename(p)
+                pstore[len(valid_paths) - 1] = page
+
+            if not imgs:
+                return (
+                    [], [], {}, None, 0,
+                    None, None, None, None, "",
+                    "<span class='muted'>No valid images loaded.</span>"
+                )
+
+            new_idx = max(0, min(len(imgs) - 1, old_idx))
+            curr = imgs[new_idx]
+            page = load_page_state(pstore, new_idx)
+            cnn_txt = "" if page.get("cnn_age", None) is None else str(int(page["cnn_age"]))
+
+            return (
+                valid_paths, imgs, pstore, curr, new_idx,
+                cv.cvtColor(curr, cv.COLOR_BGR2RGB),
+                page.get("orig_with_line", None),
+                page.get("roi_preview", None),
+                page.get("profile_img", None),
+                cnn_txt,
+                f"<span class='muted'>🧾 File list updated. Total {len(imgs)} image(s). Current index {new_idx}.</span>"
+            )
+
+        files.change(
+            fn=on_files_change,
+            inputs=[files, state_paths, state_imgs, perpage, idx],
+            outputs=[
+                state_paths, state_imgs, perpage, state_curr, idx,
                 orig_view, orig_line_view, roi_preview_view, profile_img, cnn_out,
                 info
             ]
@@ -670,6 +751,8 @@ def build_demo():
             if not imgs:
                 popup_warn("No images.")
                 return None, None, None, None, "", None, 0, ""
+            if i is None:
+                i = 0
             i = int(max(0, min(len(imgs) - 1, int(i))))
             cur = imgs[i]
             page = load_page_state(pstore, i)
@@ -701,7 +784,6 @@ def build_demo():
             outputs=[idx]
         )
 
-        # ✅ 回调改为使用固定默认参数（UI删掉了，但谷底“叉叉”仍然会画：plt.plot(...,"rx") 不变）
         def on_click_orig_line(evt: gr.SelectData, curr_bgr, i, pstore, paths):
             if curr_bgr is None:
                 popup_warn("Please upload images first.")
@@ -710,7 +792,6 @@ def build_demo():
             x, y = int(evt.index[0]), int(evt.index[1])
             page = load_page_state(pstore, int(i))
 
-            # store original RGB (for report)
             page["orig_rgb"] = cv.cvtColor(curr_bgr, cv.COLOR_BGR2RGB)
 
             if paths and 0 <= int(i) < len(paths):
@@ -740,7 +821,6 @@ def build_demo():
             vis_bgr = draw_line(curr_bgr, p1, p2, (0, 0, 255), 2)
             vis_rgb = cv.cvtColor(vis_bgr, cv.COLOR_BGR2RGB)
 
-            # --- NEW: CLAHE + normalize (like visualization()), keep the rest of the pipeline ---
             gray = cv.cvtColor(curr_bgr, cv.COLOR_BGR2GRAY)
 
             clahe = cv.createCLAHE(clipLimit=5.0, tileGridSize=(8, 8))
@@ -748,7 +828,6 @@ def build_demo():
 
             proc = cv.normalize(eq, None, 0, 255, cv.NORM_MINMAX).astype(np.uint8)
 
-            # rotated_roi_from_line expects BGR, so convert back to 3 channels
             enh_bgr = cv.cvtColor(proc, cv.COLOR_GRAY2BGR)
 
             roi_rgb = rotated_roi_from_line(
@@ -773,34 +852,43 @@ def build_demo():
             roi_gray = cv.cvtColor(roi_rgb, cv.COLOR_RGB2GRAY)
             roi_gray = cv.normalize(roi_gray, None, 0, 255, cv.NORM_MINMAX).astype(np.uint8)
 
-            # --- EXACT ring detection + peak positions from visualization_integrate.py ---
-            res = visualization(p1, p2, curr_bgr)  # uses CLAHE+normalize + line sampling + adaptive peaks on inverted
+            res = visualization(p1, p2, curr_bgr)
 
-            profile_u8 = res["profile"].astype(np.uint8)      # along-line band profile (NOT ROI center)
-            peaks = res["peaks"].astype(np.int32)             # indices into profile/xs/ys
-            xs = res["xs"].astype(np.int32)                   # x coords along the original line
-            ys = res["ys"].astype(np.int32)                   # y coords along the original line
+            profile_u8 = res["profile"].astype(np.uint8)
+            peaks = res["peaks"].astype(np.int32)
+            xs = res["xs"].astype(np.int32)
+            ys = res["ys"].astype(np.int32)
             num_rings = int(res["num_rings"])
 
-            # Draw red X on the ORIGINAL-with-line image at detected positions (xs[peaks], ys[peaks])
             vis_bgr2 = vis_bgr.copy()
             for pk in peaks:
                 if 0 <= int(pk) < len(xs):
                     draw_red_x_bgr(vis_bgr2, int(xs[int(pk)]), int(ys[int(pk)]), size=7, thickness=2)
             vis_rgb = cv.cvtColor(vis_bgr2, cv.COLOR_BGR2RGB)
 
-            # Plot INVERTED profile exactly like the peak logic (peaks are on inv)
             inv = 255.0 - profile_u8.astype(np.float32)
 
             fig = plt.figure(figsize=(6, 3), dpi=300)
-            plt.plot(inv, label="Intensity (inverted, along line)")
+            plt.plot(inv, label="Intensity curve")
             if len(peaks) > 0:
                 plt.plot(peaks, inv[peaks], "rx", label="Peaks")
             plt.title(f"peaks={len(peaks)}")
             plt.xlabel("Index along line")
-            plt.ylabel("Intensity (inverted)")
-            plt.legend()
+            plt.ylabel("Intensity value")
+            plt.legend(
+                loc="lower right",
+                fontsize=7,
+                framealpha=0.75,
+                borderpad=0.12,
+                labelspacing=0.12,
+                handlelength=1.0,
+                handletextpad=0.25,
+                borderaxespad=0.15,
+                fancybox=False
+            )
+
             plt.tight_layout(pad=2.0)
+            # plt.tight_layout(pad=2.0, rect=[0, 0, 0.86, 1])
 
             img_profile = fig_to_rgb(fig)
             plt.close(fig)
@@ -811,15 +899,14 @@ def build_demo():
             )
 
             page["line_pts"] = pts
-            page["orig_with_line"] = vis_rgb       # now includes crosses at detected ring positions
-            page["roi_preview"] = roi_rgb          # keep rotated crop EXACTLY as before (for CNN etc)
+            page["orig_with_line"] = vis_rgb
+            page["roi_preview"] = roi_rgb
             page["profile_img"] = img_profile
-            page["age"] = num_rings                # intensity-age now matches visualization() exactly
+            page["age"] = num_rings
             page["cnn_age"] = None
             pstore[int(i)] = page
 
             return vis_rgb, roi_rgb, img_profile, pstore, "", msg
-
 
         orig_view.select(
             fn=on_click_orig_line,
@@ -1060,9 +1147,6 @@ def build_demo():
     return demo
 
 
-# =============================================================================
-# Entry point for launching the Gradio demo server on localhost.
-# =============================================================================
 if __name__ == "__main__":
     demo = build_demo()
     demo.launch(server_name="127.0.0.1", theme=None)
