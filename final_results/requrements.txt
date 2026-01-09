@@ -10,3 +10,4 @@ Pillow==10.2.0
 matplotlib==3.8.2
 
 torch==2.2.1
+efficientnet_pytorch==0.7.1
